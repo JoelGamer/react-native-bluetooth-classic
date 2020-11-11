@@ -61,9 +61,7 @@ public class BluetoothException extends RuntimeException implements Mappable {
             map.putMap(DEVICE, device.map());
 
         map.putString(ERROR, message);
-
-        if (getCause() != null)
-            map.putString(MESSAGE, getCause().getLocalizedMessage());
+        map.putString(MESSAGE, getCause().getLocalizedMessage());
 
         return map;
     }

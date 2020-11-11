@@ -1,16 +1,11 @@
 
 package kjd.reactnative.bluetooth;
 
-import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothDevice;
-import android.bluetooth.BluetoothSocket;
-
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 
 import com.facebook.react.ReactPackage;
 import com.facebook.react.bridge.NativeModule;
@@ -18,17 +13,38 @@ import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.uimanager.ViewManager;
 import com.facebook.react.bridge.JavaScriptModule;
 
-import kjd.reactnative.bluetooth.conn.ConnectionAcceptorFactory;
-import kjd.reactnative.bluetooth.conn.ConnectionConnectorFactory;
 import kjd.reactnative.bluetooth.conn.ConnectionType;
-import kjd.reactnative.bluetooth.conn.DelimitedStringDeviceConnectionImpl;
+import kjd.reactnative.bluetooth.conn.DelimitedConnectionAcceptImpl;
+import kjd.reactnative.bluetooth.conn.DelimitedConnectionClientImpl;
 import kjd.reactnative.bluetooth.conn.DeviceConnectionFactory;
-import kjd.reactnative.bluetooth.conn.RfcommAcceptorThreadImpl;
-import kjd.reactnative.bluetooth.conn.RfcommConnectorThreadImpl;
-import kjd.reactnative.bluetooth.conn.StandardOption;
 
 /**
- *
+ * {@link ReactPackage} provides a method for applications to implement customized
+ * {@link NativeModule}(s).  Prior to version {@code 0.60.0} a plain old
+ * {@code new RNBluetoothClassicPackage()} was used, with auto-linking, it's still required to
+ * manually add the {@link ReactPackage} (due to the private constructor).  It would be possible
+ * to leave it public and do some other things, but this seems to be the safest bet.
+ * <p>
+ * The standard/default package has the following connections configured:
+ * <ul>
+ *     <li><strong>connect</strong> connection using {@link DelimitedConnectionClientImpl}
+ *     which connects as a client using the standard delimited messaging.</li>
+ *     <li><strong>accept</strong> connection using {@link DelimitedConnectionAcceptImpl}
+ *     which accepts a connection from a device using the standard delimited messaging.</li>
+ * </ul>
+ * The package should be added to your {@code MainApplication} using the following:
+ * <pre><code>
+ * List<ReactPackage> packages = new PackageList(this).getPackages();
+ * // Packages that cannot be autolinked yet can be added manually here, for example:
+ * // packages.add(new MyReactNativePackage());
+ * packages.add(RNBluetoothClassicPackage.DEFAULT);
+ * </code></pre>
+ * if more customized connections are required, you should:
+ * <ul>
+ *     <li>Override or implement the required changes</li>
+ *     <li>Apply the default/custom implementations into the Package factories</li>
+ *     <li>Add the package in your {@code MainApplication}</li>
+ * </ul>
  *
  * @author kenjdavidson
  *
@@ -40,73 +56,53 @@ public class RNBluetoothClassicPackage implements ReactPackage {
      */
     public static final Builder DEFAULT_BUILDER
             = RNBluetoothClassicPackage.builder()
-                .withConnectionFactory(StandardOption.CONNECTION_TYPE.defaultValue(), DelimitedStringDeviceConnectionImpl::new)
-                .withConnectorFactory(StandardOption.CONNECTOR_TYPE.defaultValue(), RfcommConnectorThreadImpl::new)
-                .withAcceptorFactory(StandardOption.ACCEPTOR_TYPE.defaultValue(), RfcommAcceptorThreadImpl::new);
+                .withFactory(ConnectionType.CLIENT.name(), () -> new DelimitedConnectionClientImpl())
+                .withFactory(ConnectionType.SERVER.name(), () -> new DelimitedConnectionAcceptImpl());
 
     /**
-     * {@link DeviceConnectionFactory} provide specific type of {@link kjd.reactnative.bluetooth.conn.DeviceConnection}
-     * based on the type requested by the user.
+     * {@link DeviceConnectionFactory} map which will be passed into the module.  The factory map
+     * is used during the connection process by passing the TYPE option into either
+     * connect or accept.  The value of this type will attempt to grab the correct type from
+     * the Factory assigned.
      */
-    private Map<String, DeviceConnectionFactory> mConnectionFactories;
-
-    /**
-     * {@link ConnectionAcceptorFactory} provide specific type of {@link kjd.reactnative.bluetooth.conn.ConnectionAcceptor}
-     * based on the type requested by the user.
-     */
-    private Map<String, ConnectionAcceptorFactory> mAcceptorFactories;
-
-    /**
-     * {@link ConnectionConnectorFactory} provide specific type of {@link kjd.reactnative.bluetooth.conn.ConnectionConnector}
-     * based on the type requested by the user.
-     */
-    private Map<String, ConnectionConnectorFactory> mConnectorFactories;
+    private Map<String, DeviceConnectionFactory> mFactories;
 
     /**
      * Creates a new package with the default {@link kjd.reactnative.bluetooth.conn.DeviceConnectionFactory}
-     * for CLIENT and SERVER.  Sadly this needs to happen as I can't get the customized auto linking
-     * working with a static variable definition.   I'll keep testing it out and if I can get it working
-     * the constructors will be made private.
+     * for CLIENT and SERVER.
      */
     public RNBluetoothClassicPackage() {
-        this.mConnectionFactories = Collections.singletonMap(
-                StandardOption.CONNECTION_TYPE.defaultValue(),
-                DelimitedStringDeviceConnectionImpl::new);
-        this.mAcceptorFactories = Collections.singletonMap(
-                StandardOption.ACCEPTOR_TYPE.defaultValue(),
-                RfcommAcceptorThreadImpl::new);
-        this.mConnectorFactories = Collections.singletonMap(
-                StandardOption.CONNECTION_TYPE.defaultValue(),
-                RfcommConnectorThreadImpl::new);
+        this.mFactories = new HashMap<>();
+        this.mFactories .put(ConnectionType.CLIENT.name(), () -> new DelimitedConnectionClientImpl());
+        this.mFactories .put(ConnectionType.SERVER.name(), () -> new DelimitedConnectionAcceptImpl());
     }
 
     /**
      * Provides the builder with a constructor.  This is the preferred method, but apprently the
-     * auto linking doesn't work exactly as defined.
+     * autolinking doesn't work exactly as defined.
      * 
-     * @param builder {@link Builder} used to create
+     * @param factories
      */
-    private RNBluetoothClassicPackage(Builder builder) {
-        this.mConnectionFactories = builder.mConnectionFactories;
-        this.mAcceptorFactories = builder.mAcceptorFactories;
-        this.mConnectorFactories = builder.mConnectorFactories;
+    private RNBluetoothClassicPackage(Map<String,DeviceConnectionFactory> factories) {
+        this.mFactories = factories;
     }
 
     /**
      * Provides the {@link RNBluetoothClassicModule} to the {@link com.facebook.react.ReactApplication}.
      *
-     * @param reactContext the {@link ReactApplicationContext} provided by the React Native
-     *                     application
-     * @return array of modules provided by this package
+     * @param reactContext
+     * @return
      */
     @Override
     public List<NativeModule> createNativeModules(ReactApplicationContext reactContext) {
-        RNBluetoothClassicModule module = new RNBluetoothClassicModule(reactContext,
-                mAcceptorFactories, mConnectorFactories, mConnectionFactories);
-        return Arrays.<NativeModule>asList(module);
+        return Arrays.<NativeModule>asList(new RNBluetoothClassicModule(reactContext, mFactories));
     }
 
     /**
+     * Previously required by {@link ReactPackage}.
+     *
+     * @return
+     *
      * @deprecated in version 0.47
      */
     public List<Class<? extends JavaScriptModule>> createJSModules() {
@@ -116,8 +112,8 @@ public class RNBluetoothClassicPackage implements ReactPackage {
     /**
      * There are currently no {@link ViewManager}(s) provided by this module.
      *
-     * @param reactContext provided by the React Native application
-     * @return empty list of {@link ViewManager}(s)
+     * @param reactContext {@link ReactApplicationContext}
+     * @return
      */
     @Override
     public List<ViewManager> createViewManagers(ReactApplicationContext reactContext) {
@@ -127,7 +123,7 @@ public class RNBluetoothClassicPackage implements ReactPackage {
     /**
      * Provides a {@link Builder}.
      *
-     * @return a {@link RNBluetoothClassicPackage.Builder}
+     * @return
      */
     public static Builder builder() {
         return new Builder();
@@ -141,32 +137,18 @@ public class RNBluetoothClassicPackage implements ReactPackage {
      * @author kendavidson
      */
     public static class Builder {
-        private Map<String, DeviceConnectionFactory> mConnectionFactories;
-        private Map<String, ConnectionAcceptorFactory> mAcceptorFactories;
-        private Map<String, ConnectionConnectorFactory> mConnectorFactories;
+        private Map<String, DeviceConnectionFactory> mFactories;
 
         private Builder() {
-            this.mConnectionFactories = new HashMap<>();
-            this.mAcceptorFactories = new HashMap<>();
-            this.mConnectorFactories = new HashMap<>();
+            this.mFactories = new HashMap<>();
         }
 
         public RNBluetoothClassicPackage build() {
-            return new RNBluetoothClassicPackage(this);
+            return new RNBluetoothClassicPackage(mFactories);
         }
 
-        public Builder withConnectionFactory(String type, DeviceConnectionFactory factory) {
-            mConnectionFactories.put(type, factory);
-            return this;
-        }
-
-        public Builder withAcceptorFactory(String type, ConnectionAcceptorFactory factory) {
-            mAcceptorFactories.put(type, factory);
-            return this;
-        }
-
-        public Builder withConnectorFactory(String type, ConnectionConnectorFactory factory) {
-            mConnectorFactories.put(type, factory);
+        public Builder withFactory(String type, DeviceConnectionFactory factory) {
+            mFactories.put(type, factory);
             return this;
         }
     }
