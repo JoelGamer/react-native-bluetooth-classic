@@ -10,18 +10,21 @@
 
 import Foundation
 
-enum EventType: String, CaseIterable {
+enum BTEvent : String, CaseIterable {
     case BLUETOOTH_ENABLED = "bluetoothEnabled"
     case BLUETOOTH_DISABLED = "bluetoothDisabled"
-    case DEVICE_CONNECTED = "deviceConnected"
-    case DEVICE_DISCONNECTED = "deviceDisconnected"
+    case BLUETOOTH_CONNECTED = "bluetoothConnected"
+    case BLUETOOTH_DISCONNECTED = "bluetoothDisconnected"
+    case CONNECTION_SUCCESS = "connectionSuccess"        // Promise only
+    case CONNECTION_FAILED = "connectionFailed"          // Promise only
+    case CONNECTION_LOST = "connectionLost"
     case READ = "read"
     case ERROR = "error"
     
     static func asDictionary() -> NSDictionary {
         let events:NSDictionary = NSMutableDictionary()
         
-        for event in EventType.allCases {
+        for event in BTEvent.allCases {
             events.setValue(event.rawValue, forKey: "\(event)")
         }
         
@@ -31,7 +34,7 @@ enum EventType: String, CaseIterable {
     static func asArray() -> [String] {
         var events:[String] = [String]()
         
-        for event in EventType.allCases {
+        for event in BTEvent.allCases {
             events.append(event.rawValue)
         }
         

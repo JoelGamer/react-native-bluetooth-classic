@@ -8,6 +8,6 @@
 
 import Foundation
 
-enum BluetoothState: Int {
-    case DISABLED = 0, ENABLED;
+enum BTState: Int {
+    case DISCONNECTED = 0, CONNECTING, CONNECTED, DISCONNECTING;
 }
