@@ -63,12 +63,10 @@ public enum StandardOption {
 
     /**
      * Provide a timeout between individual reads of the device.  This is a hold over from the
-     * original project and in most forks has been removed.   The original library had 500
-     * as the default timeout, but this was changed to 0 as it was causing a lot of people
-     * slowdowns.
-     *
+     * original project and in most forks has been removed.  If you're finding performance
+     * issues, use this set to {@code 0} to speed things up a little.
      */
-    READ_TIMEOUT("read_timeout", Integer.class, 0   ),
+    READ_TIMEOUT("read_timeout", Integer.class, 300),
 
     /**
      * Another hold over from the original was the max size of the buffer.  This defaults to {@code 1024}
